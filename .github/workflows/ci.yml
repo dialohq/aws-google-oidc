@@ -33,7 +33,16 @@ jobs:
           name: ${{ vars.CACHIX_CACHE_NAME }}
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           skipPush: ${{ secrets.CACHIX_AUTH_TOKEN == '' }}
+          pathsToPush: result
       - name: Build package
         run: nix build .#packages.${{ matrix.system }}.default --print-build-logs
+      - name: Check package closure
+        shell: bash
+        run: |
+          if nix-store --query --references ./result | grep -q -- '-crates-io-dependencies$'; then
+            echo 'Package closure contains build-time Cargo sources' >&2
+            exit 1
+          fi
+          nix path-info --closure-size --human-readable ./result
       - name: Check flake
         run: nix flake check --print-build-logs
