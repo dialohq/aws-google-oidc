@@ -11,8 +11,20 @@ permissions:
 
 jobs:
   nix:
-    name: Nix flake check
-    runs-on: ubuntu-24.04
+    name: Nix build (${{ matrix.system }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            system: x86_64-linux
+          - runner: ubuntu-24.04-arm
+            system: aarch64-linux
+          - runner: macos-15-intel
+            system: x86_64-darwin
+          - runner: macos-15
+            system: aarch64-darwin
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
       - uses: DeterminateSystems/determinate-nix-action@v3
@@ -23,4 +35,7 @@ jobs:
           name: ${{ vars.CACHIX_CACHE_NAME }}
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           skipPush: ${{ secrets.CACHIX_AUTH_TOKEN == '' }}
-      - run: nix flake check --print-build-logs
+      - name: Build package
+        run: nix build .#packages.${{ matrix.system }}.default --print-build-logs
+      - name: Check flake
+        run: nix flake check --print-build-logs
