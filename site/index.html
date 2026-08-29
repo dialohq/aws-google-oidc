@@ -68,14 +68,6 @@
         margin-bottom: 3rem;
       }
 
-      .label {
-        margin: 0 0 1.5rem;
-        color: var(--accent);
-        font: 700 0.75rem/1.4 ui-monospace, "SFMono-Regular", Consolas, monospace;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
       h2 {
         font-family: Georgia, "Times New Roman", serif;
         font-weight: 400;
@@ -155,7 +147,6 @@
         </div>
 
         <section>
-          <p class="label">01 · Installation</p>
           <h2>Install.</h2>
           <h3>Install script</h3>
           <pre><code>curl --proto '=https' --tlsv1.2 -LsSf \
@@ -165,7 +156,6 @@
         </section>
 
         <section>
-          <p class="label">02 · Configuration</p>
           <h2>Add an AWS profile.</h2>
           <pre class="wrap"><code>[profile google-oidc]
 region = eu-central-1
@@ -178,7 +168,6 @@ credential_process = aws-google-oidc
         </section>
 
         <section>
-          <p class="label">03 · Use</p>
           <h2>Run the AWS CLI.</h2>
           <pre><code>gcloud auth login
 aws sts get-caller-identity --profile google-oidc</code></pre>
