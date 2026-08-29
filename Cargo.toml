@@ -2,7 +2,10 @@
 name = "aws-google-oidc"
 version = "0.1.0"
 edition = "2024"
-description = "AWS credential process using Google OIDC for Ceph RGW"
+description = "Exchange Google OIDC tokens for short-lived AWS-compatible credentials"
+repository = "https://github.com/dialohq/aws-google-oidc"
+homepage = "https://dialohq.github.io/aws-google-oidc/"
+readme = "README.md"
 
 [dependencies]
 aws-config = "1.11.0"

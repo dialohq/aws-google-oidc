@@ -117,11 +117,11 @@ impl Profile {
         .await?;
         let profile = profiles
             .get_profile(profile_name)
-            .expect(&format!("Profile {profile_name} does not exist"));
+            .unwrap_or_else(|| panic!("Profile {profile_name} does not exist"));
         let get = |key| {
             profile
                 .get(key)
-                .expect(&format!("Profile {profile_name} is missing key {key}"))
+                .unwrap_or_else(|| panic!("Profile {profile_name} is missing key {key}"))
                 .into()
         };
 
@@ -210,7 +210,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         expiration: credentials.expiration().to_string(),
     };
     let expiration: chrono::DateTime<chrono::Local> =
-        SystemTime::try_from(credentials.expiration().clone())?.into();
+        SystemTime::try_from(*credentials.expiration())?.into();
 
     eprintln!(
         "Refreshed credentials for profile `{}`; valid until {}",
