@@ -3,9 +3,9 @@
 [![CI](https://github.com/dialohq/aws-google-oidc/actions/workflows/ci.yml/badge.svg)](https://github.com/dialohq/aws-google-oidc/actions/workflows/ci.yml)
 [![Release](https://github.com/dialohq/aws-google-oidc/actions/workflows/release.yml/badge.svg)](https://github.com/dialohq/aws-google-oidc/releases)
 
-Impersonate a Google service account and exchange its identity token for temporary AWS credentials through STS.
+Use your existing Google login as an AWS `credential_process`, without permanent AWS access keys and with secure token caching in your operating system keychain.
 
-`aws-google-oidc` runs as an AWS [`credential_process`](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html). It uses your existing `gcloud` login, so AWS tools can authenticate through Google without a long-lived AWS access key.
+`aws-google-oidc` uses `gcloud` to impersonate a Google service account, obtains an OIDC identity token, and exchanges it for temporary AWS credentials through STS. AWS tools invoke it automatically, while reusable Google tokens remain in the system credential store until shortly before they expire.
 
 ## Install
 
