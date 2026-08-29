@@ -31,6 +31,10 @@
           inherit src;
           pname = "aws-google-oidc";
           version = "0.1.0";
+          nativeBuildInputs = [pkgs.removeReferencesTo];
+          postFixup = ''
+            remove-references-to -t "$cratesio_sources" "$out/bin/aws-google-oidc"
+          '';
         };
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [rust-analyzer rustfmt cargo rustc clippy];
