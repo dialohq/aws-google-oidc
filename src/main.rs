@@ -9,7 +9,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use url::Url;
 
 #[derive(Parser)]
-#[command(about = "Exchange a Google identity token for temporary AWS credentials")]
+#[command(
+    version,
+    about = "Exchange a Google identity token for temporary AWS credentials"
+)]
 struct Cli {
     /// Name used to keep cached tokens separate and identify status messages.
     #[arg(long)]
