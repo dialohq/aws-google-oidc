@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b1215">
+    <meta
+      name="description"
+      content="Exchange Google OIDC tokens for short-lived AWS-compatible credentials."
+    >
+    <meta property="og:title" content="aws-google-oidc">
+    <meta
+      property="og:description"
+      content="Google identity in, short-lived AWS-compatible credentials out."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://dialohq.github.io/aws-google-oidc/">
+    <title>aws-google-oidc</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1215;
+        --panel: #111c20;
+        --panel-raised: #17252a;
+        --ink: #f1f7f3;
+        --muted: #9bb0aa;
+        --line: #294039;
+        --mint: #69e2a8;
+        --yellow: #f1d670;
+        --max: 1120px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 82% 8%, rgb(105 226 168 / 10%), transparent 29rem),
+          var(--bg);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .shell {
+        width: min(calc(100% - 2rem), var(--max));
+        margin-inline: auto;
+      }
+
+      nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 5rem;
+      }
+
+      .wordmark,
+      code,
+      pre,
+      .eyebrow {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      .wordmark {
+        font-size: 0.95rem;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .wordmark::before {
+        content: "> ";
+        color: var(--mint);
+      }
+
+      .nav-link {
+        color: var(--muted);
+        font-size: 0.9rem;
+        text-underline-offset: 0.3rem;
+      }
+
+      main {
+        padding: 6.5rem 0 5rem;
+      }
+
+      .hero {
+        max-width: 880px;
+      }
+
+      .eyebrow {
+        margin: 0 0 1.25rem;
+        color: var(--mint);
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        max-width: 13ch;
+        margin: 0;
+        font-size: clamp(3.25rem, 9vw, 7.4rem);
+        font-weight: 720;
+        letter-spacing: -0.065em;
+        line-height: 0.94;
+      }
+
+      .lede {
+        max-width: 680px;
+        margin: 2rem 0 2.5rem;
+        color: var(--muted);
+        font-size: clamp(1.1rem, 2vw, 1.35rem);
+      }
+
+      .terminal {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        width: min(100%, 820px);
+        min-height: 4.5rem;
+        padding: 1rem 1.1rem 1rem 1.35rem;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 0.8rem;
+        background: #080d0f;
+        box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 25%);
+      }
+
+      .terminal code {
+        min-width: max-content;
+        color: #d8e8e1;
+        font-size: 0.9rem;
+      }
+
+      .prompt {
+        color: var(--mint);
+        user-select: none;
+      }
+
+      button {
+        flex: 0 0 auto;
+        padding: 0.6rem 0.9rem;
+        border: 1px solid #41675a;
+        border-radius: 0.5rem;
+        background: var(--panel-raised);
+        color: var(--ink);
+        cursor: pointer;
+        font: 600 0.78rem/1 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      button:hover,
+      button:focus-visible {
+        border-color: var(--mint);
+        outline: none;
+      }
+
+      .platforms {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        margin-top: 1.25rem;
+        color: var(--muted);
+        font-size: 0.78rem;
+      }
+
+      .platforms span {
+        padding: 0.3rem 0.65rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        margin-top: 8rem;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 1rem;
+        background: var(--line);
+      }
+
+      .card {
+        min-height: 240px;
+        padding: 2rem;
+        background: var(--panel);
+      }
+
+      .number {
+        color: var(--yellow);
+        font: 700 0.76rem/1 "SFMono-Regular", Consolas, monospace;
+      }
+
+      h2 {
+        margin: 4rem 0 0.75rem;
+        font-size: 1.2rem;
+      }
+
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .nix {
+        display: grid;
+        grid-template-columns: 0.8fr 1.2fr;
+        gap: 4rem;
+        align-items: center;
+        padding-top: 8rem;
+      }
+
+      .nix h2 {
+        margin: 0 0 1rem;
+        font-size: clamp(2rem, 5vw, 3.5rem);
+        letter-spacing: -0.04em;
+      }
+
+      .nix p {
+        color: var(--muted);
+      }
+
+      pre {
+        margin: 0;
+        padding: 1.5rem;
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 0.8rem;
+        background: #080d0f;
+        color: #d8e8e1;
+        font-size: 0.86rem;
+        line-height: 1.8;
+      }
+
+      .accent {
+        color: var(--mint);
+      }
+
+      footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 2.5rem 0;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      @media (max-width: 760px) {
+        main {
+          padding-top: 4rem;
+        }
+
+        .terminal {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        button {
+          align-self: flex-start;
+        }
+
+        .grid,
+        .nix {
+          grid-template-columns: 1fr;
+        }
+
+        .grid {
+          margin-top: 5rem;
+        }
+
+        .nix {
+          gap: 2rem;
+          padding-top: 5rem;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="shell" aria-label="Primary navigation">
+      <a class="wordmark" href="./">aws-google-oidc</a>
+      <a class="nav-link" href="https://github.com/dialohq/aws-google-oidc">View on GitHub ↗</a>
+    </nav>
+
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">Credential process · Ceph RGW</p>
+        <h1>Google identity in. AWS credentials out.</h1>
+        <p class="lede">
+          Exchange Google OIDC tokens for short-lived AWS-compatible credentials—without storing a long-lived access key.
+        </p>
+        <div class="terminal" aria-label="Installation command">
+          <code><span class="prompt">$</span> curl --proto '=https' --tlsv1.2 -LsSf https://dialohq.github.io/aws-google-oidc/install.sh | sh</code>
+          <button type="button" data-copy>Copy</button>
+        </div>
+        <div class="platforms" aria-label="Supported platforms">
+          <span>Linux x86_64 · static</span>
+          <span>Linux aarch64 · static</span>
+          <span>macOS Apple Silicon</span>
+        </div>
+      </section>
+
+      <section class="grid" aria-label="How it works">
+        <article class="card">
+          <span class="number">01</span>
+          <h2>Ask Google</h2>
+          <p>Uses your existing gcloud session and service-account impersonation to mint an identity token.</p>
+        </article>
+        <article class="card">
+          <span class="number">02</span>
+          <h2>Exchange with STS</h2>
+          <p>Calls AssumeRoleWithWebIdentity at your AWS-compatible or Ceph RGW endpoint.</p>
+        </article>
+        <article class="card">
+          <span class="number">03</span>
+          <h2>Use AWS tools</h2>
+          <p>Returns standard credential_process JSON while the identity token stays in your system keyring.</p>
+        </article>
+      </section>
+
+      <section class="nix">
+        <div>
+          <p class="eyebrow">Nix native</p>
+          <h2>Prefer a flake?</h2>
+          <p>Run it directly, install it into a profile, or consume its package output. CI publishes all supported systems to Cachix.</p>
+          <a href="https://github.com/dialohq/aws-google-oidc#nix">Read the Nix integration guide →</a>
+        </div>
+        <pre><code><span class="accent"># Enable the binary cache</span>
+nix run nixpkgs#cachix -- use aws-google-oidc
+
+<span class="accent"># Run from the flake</span>
+nix run github:dialohq/aws-google-oidc -- \
+  --profile ceph</code></pre>
+      </section>
+    </main>
+
+    <footer class="shell">
+      <span>Built for short-lived credentials.</span>
+      <a href="https://github.com/dialohq/aws-google-oidc/releases">Releases</a>
+    </footer>
+
+    <script>
+      const command = "curl --proto '=https' --tlsv1.2 -LsSf https://dialohq.github.io/aws-google-oidc/install.sh | sh";
+      const button = document.querySelector("[data-copy]");
+
+      button.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(command);
+        button.textContent = "Copied";
+        window.setTimeout(() => {
+          button.textContent = "Copy";
+        }, 1600);
+      });
+    </script>
+  </body>
+</html>
