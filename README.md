@@ -3,9 +3,9 @@
 [![CI](https://github.com/dialohq/aws-google-oidc/actions/workflows/ci.yml/badge.svg)](https://github.com/dialohq/aws-google-oidc/actions/workflows/ci.yml)
 [![Release](https://github.com/dialohq/aws-google-oidc/actions/workflows/release.yml/badge.svg)](https://github.com/dialohq/aws-google-oidc/releases)
 
-Use your existing Google login as an AWS `credential_process`, without permanent AWS access keys and with secure token caching in your operating system keychain.
+Use your existing Google login as an AWS `credential_process` with AWS STS or compatible services such as Ceph, without permanent AWS access keys and with secure token caching in your operating system keychain.
 
-`aws-google-oidc` uses `gcloud` to impersonate a Google service account, obtains an OIDC identity token, and exchanges it for temporary AWS credentials through STS. AWS tools invoke it automatically, while reusable Google tokens remain in the system credential store until shortly before they expire.
+`aws-google-oidc` uses `gcloud` to impersonate a Google service account, obtains an OIDC identity token, and exchanges it for temporary credentials through AWS STS or a configured compatible endpoint. AWS tools invoke it automatically, while reusable Google tokens remain in the system credential store until shortly before they expire.
 
 ## Install
 
@@ -71,7 +71,7 @@ credential_process = aws-google-oidc
   --audience aws-google-oidc
 ```
 
-The helper-specific settings are flags on `credential_process`; the profile itself only contains normal AWS configuration. Use `--sts-endpoint-url URL` when connecting to a custom STS-compatible endpoint.
+The helper-specific settings are flags on `credential_process`; the profile itself only contains normal AWS configuration. Add `--sts-endpoint-url URL` when connecting to Ceph Object Gateway or another STS-compatible endpoint.
 
 ## Use
 
