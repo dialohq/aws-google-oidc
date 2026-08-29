@@ -9,21 +9,26 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use url::Url;
 
 #[derive(Parser)]
+#[command(about = "Exchange a Google identity token for temporary AWS credentials")]
 struct Cli {
+    /// Name used to keep cached tokens separate and identify status messages.
     #[arg(long)]
     profile: String,
-}
-
-struct DialoProfile {
-    dialo_role_arn: String,
-    dialo_gcloud_impersonate: String,
-    dialo_gcloud_token_audience: String,
-}
-
-struct Profile {
-    dialo: DialoProfile,
-    region: Region,
-    endpoint: Url,
+    /// AWS region in which to call STS.
+    #[arg(long)]
+    region: String,
+    /// IAM role to assume with the Google identity token.
+    #[arg(long)]
+    role_arn: String,
+    /// Google service account to impersonate.
+    #[arg(long, value_name = "EMAIL")]
+    impersonate_service_account: String,
+    /// Audience included in the Google identity token.
+    #[arg(long)]
+    audience: String,
+    /// Override the AWS STS endpoint.
+    #[arg(long)]
+    sts_endpoint_url: Option<Url>,
 }
 
 #[derive(Deserialize)]
@@ -67,18 +72,18 @@ fn gcloud_error(stderr: &str) -> IoError {
 }
 
 impl CachedToken {
-    fn new(token: String, profile: &DialoProfile) -> Result<Self, Box<dyn Error>> {
+    fn new(token: String, cli: &Cli) -> Result<Self, Box<dyn Error>> {
         let payload = token.split('.').nth(1).ok_or_else(|| {
             IoError::new(ErrorKind::InvalidData, "gcloud returned an invalid JWT")
         })?;
         let claims: TokenClaims = serde_json::from_slice(&URL_SAFE_NO_PAD.decode(payload)?)?;
 
-        if claims.aud != profile.dialo_gcloud_token_audience {
+        if claims.aud != cli.audience {
             return Err(
                 IoError::new(ErrorKind::InvalidData, "token audience does not match").into(),
             );
         }
-        if claims.email != profile.dialo_gcloud_impersonate {
+        if claims.email != cli.impersonate_service_account {
             return Err(IoError::new(
                 ErrorKind::InvalidData,
                 "token service account does not match",
@@ -94,64 +99,37 @@ impl CachedToken {
         })
     }
 
-    fn is_valid_for(&self, profile: &DialoProfile) -> bool {
+    fn is_valid_for(&self, cli: &Cli) -> bool {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system clock is before the Unix epoch")
             .as_secs();
 
         self.expires_at > now + 60
-            && self.impersonate == profile.dialo_gcloud_impersonate
-            && self.audience == profile.dialo_gcloud_token_audience
+            && self.impersonate == cli.impersonate_service_account
+            && self.audience == cli.audience
     }
 }
 
-impl Profile {
-    async fn new(profile_name: &str) -> Result<Self, Box<dyn Error>> {
-        let profiles = aws_config::profile::load(
-            &Default::default(),
-            &Default::default(),
-            &Default::default(),
-            None,
-        )
-        .await?;
-        let profile = profiles
-            .get_profile(profile_name)
-            .unwrap_or_else(|| panic!("Profile {profile_name} does not exist"));
-        let get = |key| {
-            profile
-                .get(key)
-                .unwrap_or_else(|| panic!("Profile {profile_name} is missing key {key}"))
-                .into()
-        };
-
-        Ok(Self {
-            dialo: DialoProfile {
-                dialo_role_arn: get("dialo_role_arn"),
-                dialo_gcloud_impersonate: get("dialo_gcloud_impersonate"),
-                dialo_gcloud_token_audience: get("dialo_gcloud_token_audience"),
-            },
-            region: Region::new(get("region")),
-            endpoint: Url::parse(&get("endpoint_url"))?,
-        })
-    }
-
+impl Cli {
     async fn sdk_config(&self) -> aws_config::SdkConfig {
-        aws_config::defaults(aws_config::BehaviorVersion::latest())
-            .region(self.region.clone())
-            .endpoint_url(self.endpoint.to_string())
-            .no_credentials()
-            .load()
-            .await
+        let config = aws_config::defaults(aws_config::BehaviorVersion::latest())
+            .region(Region::new(self.region.clone()))
+            .no_credentials();
+        let config = match &self.sts_endpoint_url {
+            Some(endpoint) => config.endpoint_url(endpoint.to_string()),
+            None => config,
+        };
+        config.load().await
     }
 
-    fn token(&self, profile_name: &str) -> Result<CachedToken, Box<dyn Error>> {
-        let entry = keyring::Entry::new("aws-google-oidc", profile_name)?;
+    fn token(&self) -> Result<CachedToken, Box<dyn Error>> {
+        let entry = keyring::Entry::new("aws-google-oidc", &self.profile)?;
 
         match entry.get_secret() {
             Ok(secret) => {
                 if let Ok(token) = serde_json::from_slice::<CachedToken>(&secret)
-                    && token.is_valid_for(&self.dialo)
+                    && token.is_valid_for(self)
                 {
                     return Ok(token);
                 }
@@ -164,19 +142,16 @@ impl Profile {
             .args(["auth", "print-identity-token", "--quiet", "--include-email"])
             .arg(format!(
                 "--impersonate-service-account={}",
-                self.dialo.dialo_gcloud_impersonate
+                self.impersonate_service_account
             ))
-            .arg(format!(
-                "--audiences={}",
-                self.dialo.dialo_gcloud_token_audience
-            ))
+            .arg(format!("--audiences={}", self.audience))
             .output()?;
         if !output.status.success() {
             return Err(gcloud_error(&String::from_utf8_lossy(&output.stderr)).into());
         }
 
         let token = String::from_utf8(output.stdout)?.trim().to_owned();
-        let token = CachedToken::new(token, &self.dialo)?;
+        let token = CachedToken::new(token, self)?;
         entry.set_secret(&serde_json::to_vec(&token)?)?;
         Ok(token)
     }
@@ -184,14 +159,13 @@ impl Profile {
 
 async fn run() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
-    let profile = Profile::new(&cli.profile).await?;
-    let token = profile.token(&cli.profile)?;
+    let token = cli.token()?;
 
-    let sdk_config = profile.sdk_config().await;
+    let sdk_config = cli.sdk_config().await;
     let client = aws_sdk_sts::Client::new(&sdk_config);
     let response = client
         .assume_role_with_web_identity()
-        .role_arn(&profile.dialo.dialo_role_arn)
+        .role_arn(&cli.role_arn)
         .role_session_name("aws-google-oidc")
         .web_identity_token(token.token)
         .send()
@@ -236,7 +210,31 @@ async fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::gcloud_error;
+    use super::{Cli, gcloud_error};
+    use clap::Parser;
+
+    #[test]
+    fn parses_credential_process_flags() {
+        let cli = Cli::try_parse_from([
+            "aws-google-oidc",
+            "--profile",
+            "example",
+            "--region",
+            "eu-central-1",
+            "--role-arn",
+            "arn:aws:iam::123456789012:role/google-oidc",
+            "--impersonate-service-account",
+            "aws-users@example.iam.gserviceaccount.com",
+            "--audience",
+            "aws-google-oidc",
+        ])
+        .expect("credential-process flags should parse");
+
+        assert_eq!(cli.profile, "example");
+        assert_eq!(cli.region, "eu-central-1");
+        assert_eq!(cli.audience, "aws-google-oidc");
+        assert!(cli.sts_endpoint_url.is_none());
+    }
 
     #[test]
     fn makes_reauthentication_errors_actionable() {
