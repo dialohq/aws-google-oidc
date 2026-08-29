@@ -4,7 +4,7 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::io::{Error as IoError, ErrorKind};
-use std::process::Command;
+use std::process::{Command, ExitCode};
 use std::time::{SystemTime, UNIX_EPOCH};
 use url::Url;
 
@@ -49,6 +49,21 @@ struct CredentialProcessOutput<'a> {
     secret_access_key: &'a str,
     session_token: &'a str,
     expiration: String,
+}
+
+fn gcloud_error(stderr: &str) -> IoError {
+    if stderr.contains("Reauthentication failed")
+        || stderr.contains("cannot prompt during non-interactive execution")
+    {
+        return IoError::other("Google Cloud login expired; run: gcloud auth login");
+    }
+
+    let detail = stderr
+        .lines()
+        .find_map(|line| line.split_once("ERROR:").map(|(_, detail)| detail.trim()))
+        .or_else(|| stderr.lines().rev().find(|line| !line.trim().is_empty()))
+        .unwrap_or("unknown error");
+    IoError::other(format!("gcloud failed: {detail}"))
 }
 
 impl CachedToken {
@@ -157,11 +172,7 @@ impl Profile {
             ))
             .output()?;
         if !output.status.success() {
-            return Err(IoError::other(format!(
-                "gcloud failed: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            ))
-            .into());
+            return Err(gcloud_error(&String::from_utf8_lossy(&output.stderr)).into());
         }
 
         let token = String::from_utf8(output.stdout)?.trim().to_owned();
@@ -171,8 +182,7 @@ impl Profile {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn run() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let profile = Profile::new(&cli.profile).await?;
     let token = profile.token(&cli.profile)?;
@@ -211,4 +221,40 @@ async fn main() -> Result<(), Box<dyn Error>> {
     serde_json::to_writer(std::io::stdout(), &output)?;
     println!();
     Ok(())
+}
+
+#[tokio::main]
+async fn main() -> ExitCode {
+    match run().await {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("aws-google-oidc: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::gcloud_error;
+
+    #[test]
+    fn makes_reauthentication_errors_actionable() {
+        let stderr = "WARNING: using impersonation\nERROR: Reauthentication failed. cannot prompt during non-interactive execution.\nPlease run gcloud auth login";
+
+        assert_eq!(
+            gcloud_error(stderr).to_string(),
+            "Google Cloud login expired; run: gcloud auth login"
+        );
+    }
+
+    #[test]
+    fn omits_warnings_from_other_gcloud_errors() {
+        let stderr = "WARNING: using impersonation\nERROR: permission denied\nmore details";
+
+        assert_eq!(
+            gcloud_error(stderr).to_string(),
+            "gcloud failed: permission denied"
+        );
+    }
 }
