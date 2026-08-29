@@ -2,7 +2,7 @@
 name = "aws-google-oidc"
 version = "0.1.0"
 edition = "2024"
-description = "Exchange Google OIDC tokens for short-lived AWS-compatible credentials"
+description = "Exchange Google OIDC tokens for temporary AWS credentials through STS"
 repository = "https://github.com/dialohq/aws-google-oidc"
 homepage = "https://dialohq.github.io/aws-google-oidc/"
 readme = "README.md"

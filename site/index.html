@@ -6,12 +6,12 @@
     <meta name="theme-color" content="#fffcf4">
     <meta
       name="description"
-      content="Exchange Google OIDC tokens for short-lived AWS-compatible credentials."
+      content="Exchange Google OIDC tokens for temporary AWS credentials through STS."
     >
     <meta property="og:title" content="aws-google-oidc">
     <meta
       property="og:description"
-      content="Google identity in, short-lived AWS-compatible credentials out."
+      content="Impersonate a Google service account and exchange its identity token for temporary AWS credentials through STS."
     >
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://dialohq.github.io/aws-google-oidc/">
@@ -52,7 +52,6 @@
         margin: 0 auto;
       }
 
-      header,
       footer {
         display: flex;
         justify-content: space-between;
@@ -61,17 +60,12 @@
         font-size: 0.9rem;
       }
 
-      header {
-        border-bottom: 1px solid var(--line);
-      }
-
-      .name {
-        font-weight: 700;
-        text-decoration: none;
-      }
-
       main {
-        padding: 7rem 0;
+        padding: 3.5rem 0 4rem;
+      }
+
+      .hero {
+        margin-bottom: 3rem;
       }
 
       .label {
@@ -82,25 +76,17 @@
         text-transform: uppercase;
       }
 
-      h1,
       h2 {
         font-family: Georgia, "Times New Roman", serif;
         font-weight: 400;
       }
 
-      h1 {
-        max-width: 12ch;
-        margin: 0;
-        font-size: clamp(3.25rem, 10vw, 6.5rem);
-        letter-spacing: -0.055em;
-        line-height: 0.95;
-      }
-
       .intro {
-        max-width: 620px;
-        margin: 2rem 0 3rem;
-        color: var(--muted);
-        font-size: 1.15rem;
+        max-width: 700px;
+        margin: 0 0 1rem;
+        color: var(--text);
+        font-size: clamp(1.5rem, 3vw, 2rem);
+        line-height: 1.35;
       }
 
       pre {
@@ -112,22 +98,29 @@
         font: 0.85rem/1.7 ui-monospace, "SFMono-Regular", Consolas, monospace;
       }
 
-      .platforms {
-        margin: 0.8rem 0 0;
-        color: var(--muted);
-        font-size: 0.8rem;
+      .wrap {
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+      }
+
+      section {
+        padding-top: 3rem;
+        border-top: 1px solid var(--line);
       }
 
       section + section {
-        margin-top: 4rem;
-        padding-top: 4rem;
-        border-top: 1px solid var(--line);
+        margin-top: 3rem;
       }
 
       h2 {
         margin: 0 0 0.75rem;
         font-size: 2rem;
         letter-spacing: -0.025em;
+      }
+
+      h3 {
+        margin: 2rem 0 0.5rem;
+        font-size: 1rem;
       }
 
       section p {
@@ -141,10 +134,9 @@
 
       @media (max-width: 560px) {
         main {
-          padding: 4.5rem 0;
+          padding: 3rem 0 4rem;
         }
 
-        header,
         footer {
           align-items: flex-start;
           flex-direction: column;
@@ -154,35 +146,44 @@
   </head>
   <body>
     <div class="page">
-      <header>
-        <a class="name" href="./">aws-google-oidc</a>
-        <a href="https://github.com/dialohq/aws-google-oidc">GitHub ↗</a>
-      </header>
-
       <main>
-        <section>
-          <p class="label">Open source · credential process</p>
-          <h1>Google identity in. AWS credentials out.</h1>
+        <div class="hero">
           <p class="intro">
-            Exchange a Google identity token for short-lived AWS-compatible credentials. Built for S3-compatible services backed by Ceph RGW.
+            Impersonate a Google service account and exchange its identity token for temporary AWS credentials through STS.
           </p>
+          <a href="https://github.com/dialohq/aws-google-oidc">GitHub ↗</a>
+        </div>
+
+        <section>
+          <p class="label">01 · Installation</p>
+          <h2>Install.</h2>
+          <h3>Install script</h3>
           <pre><code>curl --proto '=https' --tlsv1.2 -LsSf \
   https://dialohq.github.io/aws-google-oidc/install.sh | sh</code></pre>
-          <p class="platforms">Static Linux binaries for x86_64 and aarch64. Apple Silicon macOS.</p>
+          <h3>Nix</h3>
+          <p>Use the <code>github:dialohq/aws-google-oidc</code> flake. Prebuilt outputs are available from the <a href="https://app.cachix.org/cache/aws-google-oidc">aws-google-oidc Cachix cache</a>.</p>
         </section>
 
         <section>
-          <p class="label">Nix</p>
-          <h2>Run from the flake.</h2>
-          <pre><code>nix run nixpkgs#cachix -- use aws-google-oidc
-nix run github:dialohq/aws-google-oidc -- --profile ceph</code></pre>
+          <p class="label">02 · Configuration</p>
+          <h2>Add an AWS profile.</h2>
+          <pre class="wrap"><code>[profile google-oidc]
+region = eu-central-1
+credential_process = aws-google-oidc
+  --profile google-oidc
+  --region eu-central-1
+  --role-arn arn:aws:iam::123456789012:role/google-oidc
+  --impersonate-service-account aws-users@example.iam.gserviceaccount.com
+  --audience aws-google-oidc</code></pre>
         </section>
 
         <section>
-          <p class="label">Configuration</p>
-          <h2>Use it as an AWS credential process.</h2>
-          <p>The README covers Google service-account impersonation, Ceph STS settings, AWS profiles, and flake integration.</p>
-          <a href="https://github.com/dialohq/aws-google-oidc#configure">Read the setup guide →</a>
+          <p class="label">03 · Use</p>
+          <h2>Run the AWS CLI.</h2>
+          <pre><code>gcloud auth login
+aws sts get-caller-identity --profile google-oidc</code></pre>
+          <p>The AWS CLI invokes the credential process automatically.</p>
+          <a href="https://github.com/dialohq/aws-google-oidc#configure-aws">Read the complete setup guide →</a>
         </section>
       </main>
 
