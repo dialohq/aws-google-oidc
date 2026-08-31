@@ -30,13 +30,15 @@
         packages.default = naersk'.buildPackage {
           inherit src;
           pname = "aws-google-oidc";
-          version = "0.1.0";
+          version = "0.1.1";
           overrideMain = old: {
             nativeBuildInputs = (old.nativeBuildInputs or []) ++ [pkgs.removeReferencesTo];
             disallowedReferences = (old.disallowedReferences or []) ++ [old.cratesio_sources];
-            postFixup = (old.postFixup or "") + ''
-              remove-references-to -t "$cratesio_sources" "$out/bin/aws-google-oidc"
-            '';
+            postFixup =
+              (old.postFixup or "")
+              + ''
+                remove-references-to -t "$cratesio_sources" "$out/bin/aws-google-oidc"
+              '';
           };
         };
         devShells.default = pkgs.mkShell {
